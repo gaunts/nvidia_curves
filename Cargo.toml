@@ -1,0 +1,3 @@
+[workspace]
+members = ["nvml-wrapper", "nvml-wrapper-sys", "nvidia-curves"]
+resolver = "2"
