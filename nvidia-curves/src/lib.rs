@@ -1,16 +1,16 @@
 use std::process::Command;
-
-use nvml_wrapper::{Device, Nvml};
-
+use nvml_wrapper::{enum_wrappers::device::TemperatureSensor, Nvml};
 
 pub struct FanControl {
     current_speed: Option<u32>,
+    nvml: Nvml,
 }
 
 impl FanControl {
     pub fn new() -> FanControl {
         FanControl {
             current_speed: None,
+            nvml: Nvml::init().unwrap()
         }
     }
 
@@ -34,21 +34,31 @@ impl FanControl {
             .expect("Error setting GPUTargetFanSpeed");
     }
 
-    pub fn set_control_speed(&mut self, device: &Device, speed: Option<u32>) {
+    pub fn get_temperature(&self) -> u32 {
+        let device = self.nvml.device_by_index(0).expect("Could not get device");
+        device.temperature(TemperatureSensor::Gpu).expect("Could not get temperature")
+    }
+
+    pub fn set_control_speed(&mut self, speed: Option<u32>) {
+        let device = self.nvml.device_by_index(0).expect("Could not get device");
+        let num_fans = device.num_fans().expect("Could not get number of fans");
+
         if self.current_speed == speed {
             return;
         }
 
         if self.current_speed.is_some() && speed.is_none() {
-            device.set_default_fan_speed(0).expect("Could not reset fan speed");
-            device.set_default_fan_speed(1).expect("Could not reset fan speed");
+            for i in 0..num_fans {
+               device.set_default_fan_speed(i).expect("Could not reset fan speed");
+            }
         }
 
         self.current_speed = speed;
         let Some(speed) = speed else {
             return;
         };
-        device.set_fan_speed(0, speed).expect("Could not set fan speed");
-        device.set_fan_speed(1, speed).expect("Could not set fan speed");
+        for i in 0..num_fans {
+            device.set_fan_speed(i, speed).expect("Could not set fan speed");
+        }
     }
 }
