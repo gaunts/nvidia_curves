@@ -7,8 +7,8 @@ struct CurvePoint {
 }
 
 static CURVE: [CurvePoint; 8] = [
-    CurvePoint{ temperature: 40, speed: 35 },
-    CurvePoint{ temperature: 45, speed: 45 },
+    CurvePoint{ temperature: 50, speed: 35 },
+    CurvePoint{ temperature: 60, speed: 40 },
     CurvePoint{ temperature: 65, speed: 45 },
     CurvePoint{ temperature: 70, speed: 50 },
     CurvePoint{ temperature: 75, speed: 55 },
@@ -27,8 +27,6 @@ fn main() {
             .iter()
             .filter_map(|p| if p.temperature <= temp { Some(p.speed) } else { None })
             .last();
-
-        println!("{temp}");
 
         if let Some(speed) = speed {
             fan_control.set_control_speed(Some(speed));
