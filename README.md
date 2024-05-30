@@ -7,7 +7,7 @@ Use at your own risks.
 
 ## Description
 
-This project was started to control nvidia fan speeds on Arch-linux.
+This project was started to control nvidia fan speeds on Arch-linux. As it turns out, it is also compatible with windows.
 I didn't find any solution combining every feature I needed so I started my own.
 The combined list of features I am looking for which I couldn't find in any other project :
 - Starting as a service in the background.
