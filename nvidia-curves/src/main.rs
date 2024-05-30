@@ -28,11 +28,7 @@ fn main() {
             .filter_map(|p| if p.temperature <= temp { Some(p.speed) } else { None })
             .last();
 
-        if let Some(speed) = speed {
-            fan_control.set_control_speed(Some(speed));
-        } else {
-            fan_control.set_control_speed(None);
-        };
+        fan_control.set_control_speed(speed);
 
         std::thread::sleep(Duration::from_secs(2));
     }
