@@ -1,5 +1,6 @@
-use std::process::Command;
 use nvml_wrapper::{enum_wrappers::device::TemperatureSensor, Nvml};
+
+use crate::curves::CurvePoint;
 
 pub struct FanControl {
     current_speed: Option<u32>,
@@ -14,32 +15,12 @@ impl FanControl {
         }
     }
 
-    #[allow(unused)]
-    fn send_state_command(state: bool) {
-        Command::new("sudo")
-            .arg("nvidia-settings")
-            .arg("-a")
-            .arg(format!("GPUFanControlState={}", if state { "1" } else { "0" }))
-            .status()
-            .expect("Error setting GPUFanControlState");
-    }
-
-    #[allow(unused)]
-    fn send_speed_command(speed: u32) {
-        Command::new("sudo")
-            .arg("nvidia-settings")
-            .arg("-a")
-            .arg(format!("GPUTargetFanSpeed={speed}"))
-            .status()
-            .expect("Error setting GPUTargetFanSpeed");
-    }
-
-    pub fn get_temperature(&self) -> u32 {
+    fn get_temperature(&self) -> u32 {
         let device = self.nvml.device_by_index(0).expect("Could not get device");
         device.temperature(TemperatureSensor::Gpu).expect("Could not get temperature")
     }
 
-    pub fn set_control_speed(&mut self, speed: Option<u32>) {
+    fn set_control_speed(&mut self, speed: Option<u32>) {
         let device = self.nvml.device_by_index(0).expect("Could not get device");
         let num_fans = device.num_fans().expect("Could not get number of fans");
 
@@ -60,5 +41,16 @@ impl FanControl {
         for i in 0..num_fans {
             device.set_fan_speed(i, speed).expect("Could not set fan speed");
         }
+    }
+
+    pub fn update_fan_speed(&mut self, curve: &[CurvePoint]) {
+        let temp = self.get_temperature();
+
+        let speed = curve
+            .iter()
+            .filter_map(|p| if p.temperature <= temp { Some(p.speed) } else { None })
+            .last();
+
+        self.set_control_speed(speed);
     }
 }
