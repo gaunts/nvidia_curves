@@ -22,3 +22,5 @@ This repository includes updated versions of [nvml-wrapper](https://crates.io/cr
 - Read curves from a file, with profile management
 - Add a client to switch between profiles from the command line
 - Add a gui tool to edit curves visually
+
+cargo clippy -- -D clippy::correctness -D clippy::complexity -D clippy::pedantic -D clippy::nursery -D clippy::perf --no-deps
