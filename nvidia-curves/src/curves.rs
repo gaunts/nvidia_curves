@@ -1,6 +1,35 @@
+use core::fmt;
 use std::{collections::HashMap, error::Error};
 
-use crate::config_readers::ConfReader;
+pub trait ConfReader {
+    fn get_conf_string(&self) -> Result<String, Box<dyn Error>>;
+}
+
+pub struct LinuxConfReader {}
+
+#[derive(Debug)]
+pub enum ConfReaderError {
+    IoError(String, std::io::Error),
+}
+
+impl Error for ConfReaderError {}
+
+impl fmt::Display for ConfReaderError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::IoError(path, err) => write!(f, "IO Error at path '{path}': {err}"),
+        }
+    }
+}
+
+impl ConfReader for LinuxConfReader {
+    fn get_conf_string(&self) -> Result<String, Box<dyn Error>> {
+        const PATH: &str = "/etc/nvidia-curves.d/curves.conf";
+        Ok(std::fs::read_to_string(PATH)
+            .map_err(|err| ConfReaderError::IoError(PATH.to_string(), err))?
+        )
+    }
+}
 
 #[derive(Debug)]
 struct SpeedTooHighError {
@@ -19,7 +48,7 @@ pub struct CurvePoint {
 }
 
 impl CurvePoint {
-    fn new(temperature: u32, speed: u32) -> Result<Self, SpeedTooHighError> {
+    const fn new(temperature: u32, speed: u32) -> Result<Self, SpeedTooHighError> {
         if speed > 100 {
             Err(SpeedTooHighError{ value: speed })
         } else {
@@ -31,6 +60,29 @@ impl CurvePoint {
     }
 }
 
+#[derive(Debug)]
+pub enum InvalidProfileNameError {
+    Empty,
+    TooBig,
+    WrongCharacters
+}
+
+#[derive(Debug)]
+pub enum CurveConfLoadingError {
+    UnexpectedEmptyLine(u32),
+    UnexpectedCharacter(u32),
+    EmptyCurve,
+    InvalidCurvePoint,
+    InvalidProfileName(InvalidProfileNameError)
+}
+impl std::error::Error for CurveConfLoadingError {}
+impl fmt::Display for CurveConfLoadingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        todo!()
+    }
+}
+
+
 pub struct CurveManager {
     curves: HashMap<Option<String>, Vec<CurvePoint>>
 }
@@ -39,7 +91,7 @@ impl TryFrom<&dyn ConfReader> for CurveManager {
     type Error = Box<dyn Error>;
 
     fn try_from(value: &dyn ConfReader) -> Result<Self, Self::Error> {
-        let mut loader = CurveManager {
+        let mut loader = Self {
             curves: HashMap::new()
         };
         let conf_string = value.get_conf_string()?;
@@ -67,6 +119,9 @@ impl CurveManager {
         let mut curve_points: Vec<CurvePoint> = Vec::new();
 
         for line in lines {
+            if line.is_empty() {
+                Err(CurveConfLoadingError::UnexpectedEmptyLine(1))?
+            }
             if line.starts_with('[') && line.ends_with(']') {
                 profile = Some(line[1..line.len()-1].to_string());
             } else {
@@ -81,18 +136,47 @@ impl CurveManager {
         Ok((profile, curve_points))
     }
     
-    pub fn get_curve(&self, profile_name: &Option<String>) -> &Vec<CurvePoint> {
-        self.curves.get(profile_name).unwrap()
+    pub fn get_curve(&self, profile_name: &Option<String>) -> Option<&Vec<CurvePoint>>  {
+        self.curves.get(profile_name)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{ConfReader, CurveManager};
+
+    struct TestConfReader<'a> {
+        conf_string: &'a str
+    }
+
+    impl<'a>  ConfReader for TestConfReader<'a>  {
+        fn get_conf_string(&self) -> Result<String, Box<dyn std::error::Error>> {
+            Ok(self.conf_string.to_owned())
+        }
+    }
 
     #[test]
-    fn it_works() {
-        // let curves_loader = CurvesManager::new(&["../resources/tests/curves1.conf"]);
-
+    fn unexpected_character() {
+        let conf_reader = TestConfReader { conf_string: "asdsqds" };
+        let manager = CurveManager::try_from(&conf_reader as &dyn ConfReader);
+        assert!(manager.is_err());
+    }
+    
+    #[test]
+    fn unexpected_empty_line() {
+        let conf_reader = TestConfReader { conf_string: 
+"
+[profile1]
+12 54
+54 88
+"};
+        let manager = CurveManager::try_from(&conf_reader as &dyn ConfReader);
+        assert!(manager.is_err());
+        if let Err(e) = manager {
+            let e = e.downcast::<crate::curves::CurveConfLoadingError>();
+            assert!(e.is_ok_and(|e| {
+                matches!(*e, crate::curves::CurveConfLoadingError::UnexpectedEmptyLine(line) if line == 1)
+            }));
+        }
     }
 }

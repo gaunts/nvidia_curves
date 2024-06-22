@@ -8,8 +8,8 @@ pub struct FanControl {
 }
 
 impl FanControl {
-    pub fn new() -> FanControl {
-        FanControl {
+    pub fn new() -> Self {
+        Self {
             current_speed: None,
             nvml: Nvml::init().unwrap()
         }
